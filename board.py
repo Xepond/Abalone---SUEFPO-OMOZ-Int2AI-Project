@@ -46,15 +46,15 @@ class Board:
         elif self.selected:
             move_data, reason = self.validate_move(self.selected, q, r)
             if move_data:
-                self.apply_move(move_data)
+                # self.apply_move(move_data) # MOVED to main.py for animation sync
                 self.selected = [] # Clear selection after move
-                return True, None
+                return move_data, None
             else:
                 # Invalid move, clear selection to be safe or just ignore
                 self.selected = []
-                return False, reason
+                return None, reason
         
-        return False, None
+        return None, None
 
     def validate_move(self, selected, target_q, target_r):
         """

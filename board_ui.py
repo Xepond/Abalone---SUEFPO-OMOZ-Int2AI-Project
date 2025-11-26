@@ -34,6 +34,7 @@ class BoardUI:
             self.white_marble = None
         
         self.animations = [] # List of dicts: {key, start, end, color, start_time, duration, on_finish}
+        self.is_animating = False
         
         # Precompute valid board coordinates (61 cells)
         self.valid_cells = self._generate_valid_cells()
@@ -42,6 +43,47 @@ class BoardUI:
         self.debug_font = pygame.font.SysFont("Arial", 12, bold=True)
         self.ui_font = pygame.font.SysFont("Arial", 18, bold=True)
         self.ui_font_small = pygame.font.SysFont("Arial", 14)
+
+    def start_move_animation(self, move_anim_data):
+        """
+        Start animations for a move.
+        move_anim_data: List of tuples (color, start_q, start_r, end_q, end_r)
+        """
+        self.animations = []
+        current_time = pygame.time.get_ticks()
+        duration = 250 # ms
+        
+        for color, sq, sr, eq, er in move_anim_data:
+            self.animations.append({
+                'key': (eq, er), # The destination cell (to hide static marble)
+                'start': (sq, sr),
+                'end': (eq, er),
+                'color': color,
+                'start_time': current_time,
+                'duration': duration
+            })
+            
+        self.is_animating = True
+
+    def update_animations(self):
+        """
+        Update animation progress.
+        """
+        if not self.is_animating:
+            return
+            
+        current_time = pygame.time.get_ticks()
+        active_anims = []
+        
+        for anim in self.animations:
+            elapsed = current_time - anim['start_time']
+            if elapsed < anim['duration']:
+                active_anims.append(anim)
+        
+        self.animations = active_anims
+        
+        if not self.animations:
+            self.is_animating = False
 
     def _generate_valid_cells(self):
         """
@@ -545,36 +587,4 @@ class BoardUI:
             text_rect = text_surf.get_rect(center=(int(x), int(y)))
             self.screen.blit(text_surf, text_rect)
 
-    def start_animation(self, start_qr, end_qr, color, on_finish_callback=None, duration=200):
-        """
-        Start moving a marble from start_qr to end_qr.
-        """
-        self.animations.append({
-            'key': start_qr, # Hide the marble at the start position
-            'start': start_qr,
-            'end': end_qr,
-            'color': color,
-            'start_time': pygame.time.get_ticks(),
-            'duration': duration,
-            'on_finish': on_finish_callback
-        })
 
-    def update_animations(self):
-        """
-        Update animation states and trigger callbacks for finished animations.
-        """
-        current_time = pygame.time.get_ticks()
-        finished = []
-        active = []
-        
-        for anim in self.animations:
-            if current_time - anim['start_time'] >= anim['duration']:
-                finished.append(anim)
-            else:
-                active.append(anim)
-        
-        self.animations = active
-        
-        for anim in finished:
-            if anim['on_finish']:
-                anim['on_finish']()

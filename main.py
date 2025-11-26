@@ -74,6 +74,10 @@ def main():
             # Mouse Events
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1: # Left click
+                    # Block input if animating
+                    if board_ui.is_animating:
+                        continue
+                        
                     mouse_x, mouse_y = pygame.mouse.get_pos()
                     
                     if game_state == "MENU_HOME":
@@ -144,14 +148,34 @@ def main():
                     elif game_state == "GAME_RUNNING":
                         q, r = board_ui.pixel_to_axial(mouse_x, mouse_y)
                         
-                        move_made = False
+                        move_data = None
                         reason = None
                         
                         # Handle click ONLY if it's user's turn
                         if ai_color is None or current_turn == player_color:
-                            move_made, reason = game_board.handle_click(q, r, current_turn)
+                            move_data, reason = game_board.handle_click(q, r, current_turn)
                             
-                        if move_made:
+                        if move_data:
+                            # Prepare Animation Data
+                            anim_data = []
+                            dq, dr = move_data['dir']
+                            
+                            # Own marbles
+                            for mq, mr in move_data['marbles']:
+                                color = game_board.grid[(mq, mr)].color
+                                anim_data.append((color, mq, mr, mq + dq, mr + dr))
+                                
+                            # Opponent marbles (Push)
+                            for oq, or_ in move_data['push_opponent']:
+                                color = game_board.grid[(oq, or_)].color
+                                anim_data.append((color, oq, or_, oq + dq, or_ + dr))
+                                
+                            # Start Animation
+                            board_ui.start_move_animation(anim_data)
+                            
+                            # Apply Move (Logical Update)
+                            game_board.apply_move(move_data)
+                            
                             # Switch turn
                             current_turn = 'W' if current_turn == 'B' else 'B'
                             last_move_str = f"Click at {q},{r}" # Simplified
