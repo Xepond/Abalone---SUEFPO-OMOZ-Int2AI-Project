@@ -277,34 +277,36 @@ class Board:
             
         return None
 
-    def init_board(self):
+    def init_board(self, top_color='W', bottom_color='B'):
         """
         Initialize the standard Abalone board setup.
+        top_color: Color of pieces at the top (default 'W')
+        bottom_color: Color of pieces at the bottom (default 'B')
         """
         self.grid = {}
         
-        # White (Top Side)
+        # Top Side
         # Row r = -4: All 5 cells (q: 0 to 4)
         for q in range(0, 5):
-            self.add_piece(q, -4, 'W')
+            self.add_piece(q, -4, top_color)
             
         # Row r = -3: All 6 cells (q: -1 to 4)
         for q in range(-1, 5):
-            self.add_piece(q, -3, 'W')
+            self.add_piece(q, -3, top_color)
             
         # Row r = -2: Middle 3 cells (q: 0, 1, 2)
         for q in range(0, 3):
-            self.add_piece(q, -2, 'W')
+            self.add_piece(q, -2, top_color)
             
-        # Black (Bottom Side)
+        # Bottom Side
         # Row r = 4: All 5 cells (q: -4 to 0)
         for q in range(-4, 1):
-            self.add_piece(q, 4, 'B')
+            self.add_piece(q, 4, bottom_color)
             
         # Row r = 3: All 6 cells (q: -4 to 1)
         for q in range(-4, 2):
-            self.add_piece(q, 3, 'B')
+            self.add_piece(q, 3, bottom_color)
             
         # Row r = 2: Middle 3 cells (q: -2, -1, 0)
         for q in range(-2, 1):
-            self.add_piece(q, 2, 'B')
+            self.add_piece(q, 2, bottom_color)

@@ -32,6 +32,9 @@ def main():
     game_board.init_board()
     
     current_turn = 'B' # Black starts
+    player_color = 'B' # Default
+    ai_color = 'W' # Default
+    ai_thinking = False
     debug_mode = False
     last_move_str = "-"
     
@@ -83,20 +86,71 @@ def main():
                     elif game_state == "MENU_MODE_SELECT":
                         action = main_menu.handle_mode_select_input(event)
                         if action == "VS_AI":
-                            print("Selected: Play vs AI")
-                            game_state = "GAME_RUNNING"
+                            print("Selected: Play vs AI -> Setup")
+                            game_state = "MENU_AI_SETUP"
                         elif action == "LOCAL":
                             print("Selected: Local 2 Players")
                             game_state = "GAME_RUNNING"
+                            # Default setup for local
+                            game_board.init_board()
+                            current_turn = 'B'
+                            player_color = 'B' # Both are players really
+                            ai_color = None # No AI
                         elif action == "BACK":
                             game_state = "MENU_HOME"
+                            
+                    elif game_state == "MENU_AI_SETUP":
+                        result = main_menu.handle_ai_setup_input(event)
+                        if result == "BACK":
+                            game_state = "MENU_MODE_SELECT"
+                        elif isinstance(result, dict) and result.get("action") == "START":
+                            print(f"Starting Game vs AI: {result}")
+                            
+                            # Determine Player Color
+                            player_color_str = result["color"]
+                            if "BLACK" in player_color_str:
+                                player_color = 'B'
+                                ai_color = 'W'
+                            else:
+                                player_color = 'W'
+                                ai_color = 'B'
+                                
+                            # Initialize Game with AI settings
+                            # User is always at BOTTOM, AI at TOP
+                            game_board.init_board(top_color=ai_color, bottom_color=player_color)
+                            game_board.black_score = 0
+                            game_board.white_score = 0
+                            
+                            # Determine AI Difficulty
+                            algo_str = result["algorithm"]
+                            ai_depth = 2
+                            if "Depth 3" in algo_str:
+                                ai_depth = 3
+                            elif "Greedy" in algo_str:
+                                ai_depth = 1 
+                                
+                            current_turn = 'B' # Black always starts
+                            game_state = "GAME_RUNNING"
+                            winner = None
+                            last_move_str = "-"
+                            
+                            # Check if AI starts
+                            if ai_color == 'B':
+                                ai_thinking = True
+                                print("AI (Black) starts thinking...")
+                            else:
+                                ai_thinking = False
                             
                     elif game_state == "GAME_RUNNING":
                         q, r = board_ui.pixel_to_axial(mouse_x, mouse_y)
                         
-                        # Handle click
-                        move_made, reason = game_board.handle_click(q, r, current_turn)
+                        move_made = False
+                        reason = None
                         
+                        # Handle click ONLY if it's user's turn
+                        if ai_color is None or current_turn == player_color:
+                            move_made, reason = game_board.handle_click(q, r, current_turn)
+                            
                         if move_made:
                             # Switch turn
                             current_turn = 'W' if current_turn == 'B' else 'B'
@@ -113,6 +167,11 @@ def main():
                                 game_state = "GAME_OVER"
                                 winner = "Black"
                                 print("Black Wins!")
+                                
+                            # If vs AI, trigger AI
+                            if ai_color is not None and current_turn == ai_color:
+                                ai_thinking = True
+                                print("AI Turn, thinking...")
                         elif reason:
                             # Invalid move notification
                             current_notification = reason
@@ -160,6 +219,8 @@ def main():
             main_menu.draw_home(screen)
         elif game_state == "MENU_MODE_SELECT":
             main_menu.draw_mode_select(screen)
+        elif game_state == "MENU_AI_SETUP":
+            main_menu.draw_ai_setup(screen)
                 
         elif game_state in ["GAME_RUNNING", "GAME_OVER"]:
             draw_state = {pos: piece.color for pos, piece in game_board.grid.items()}
