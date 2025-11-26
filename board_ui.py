@@ -96,7 +96,7 @@ class BoardUI:
             
         return int(rx), int(ry)
 
-    def draw(self, board_state, selected_cells=[], debug=False, ui_data=None, ghost_positions=None, ghost_color=None, notification_text=None):
+    def draw(self, board_state, selected_cells=None, debug=False, ui_data=None, ghost_positions=None, ghost_color=None, notification_text=None, ejected_ghost=None):
         """
         Main draw function.
         board_state: dict {(q, r): color_char}
@@ -105,6 +105,7 @@ class BoardUI:
         ghost_positions: list of (q, r) for ghost marbles
         ghost_color: 'B' or 'W'
         notification_text: String to display as toast message
+        ejected_ghost: (q, r) tuple if a marble is ejected
         """
         # Draw Background
         if self.bg_image:
@@ -126,8 +127,8 @@ class BoardUI:
             self._draw_socket(x, y, q, r, debug)
         
         # Draw Ghosts
-        if ghost_positions and ghost_color:
-            self.draw_ghosts(ghost_positions, ghost_color)
+        if ghost_positions or ejected_ghost:
+            self.draw_ghosts(ghost_positions, ghost_color, ejected_ghost)
 
         # Identify marbles currently animating to skip drawing their static state
         animating_keys = {anim['key'] for anim in self.animations}
@@ -203,7 +204,7 @@ class BoardUI:
         text_rect = text_surf.get_rect(center=(x + width // 2, y + height // 2))
         self.screen.blit(text_surf, text_rect)
 
-    def draw_ghosts(self, ghost_positions, color):
+    def draw_ghosts(self, ghost_positions, color, ejected_ghost=None):
         """
         Draw semi-transparent ghost marbles.
         """
@@ -223,6 +224,7 @@ class BoardUI:
             ring_surf = pygame.Surface((surf_size, surf_size), pygame.SRCALPHA)
             pygame.draw.circle(ring_surf, (200, 200, 200, 80), (surf_size // 2, surf_size // 2), radius, 1)
 
+        # Draw Normal Ghosts
         for q, r in ghost_positions:
             x, y = self.axial_to_pixel(q, r)
             
@@ -234,6 +236,41 @@ class BoardUI:
             if ring_surf:
                 ring_rect = ring_surf.get_rect(center=(x, y))
                 self.screen.blit(ring_surf, ring_rect)
+
+        # Draw Ejected Ghost (if any)
+        if ejected_ghost:
+            q, r = ejected_ghost
+            x, y = self.axial_to_pixel(q, r)
+            
+            # Draw Ghost Marble (Opponent color usually, but here we just use the passed color? 
+            # Wait, if I push opponent, the ghost should be opponent color.
+            # But the 'color' arg is 'current_turn'.
+            # If I push opponent, the ejected piece is opponent's.
+            # So we should probably switch color for ejected ghost if it's opponent.
+            # But for now, let's just use the ghost_img. 
+            # Actually, if I push White as Black, the ejected ghost should be White.
+            # Let's check logic in main.py. We pass ghost_color=current_turn.
+            # We might need to handle color better. 
+            # But the prompt says "Draw the semi-transparent ghost marble... Draw Red X".
+            # Let's stick to the prompt. It implies using the same ghost style.
+            # But logically it should be the opponent's color.
+            # Let's try to infer color. If current_turn is 'B', ejected is 'W'.
+            
+            ejected_color = 'W' if color == 'B' else 'B'
+            e_img = self.black_marble if ejected_color == 'B' else self.white_marble
+            if e_img:
+                e_ghost = e_img.copy()
+                e_ghost.set_alpha(135)
+                rect = e_ghost.get_rect(center=(x, y))
+                self.screen.blit(e_ghost, rect)
+            
+            # Draw Red X
+            # Radius
+            R = int(self.hex_size * 0.85)
+            # Line 1
+            pygame.draw.line(self.screen, (200, 0, 0), (x - R/2, y - R/2), (x + R/2, y + R/2), 4)
+            # Line 2
+            pygame.draw.line(self.screen, (200, 0, 0), (x + R/2, y - R/2), (x - R/2, y + R/2), 4)
 
     def _draw_top_bar(self, ui_data):
         """

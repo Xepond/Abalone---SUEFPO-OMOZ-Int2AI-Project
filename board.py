@@ -310,3 +310,42 @@ class Board:
         # Row r = 2: Middle 3 cells (q: -2, -1, 0)
         for q in range(-2, 1):
             self.add_piece(q, 2, bottom_color)
+
+    def get_ghost_positions(self, target_q, target_r):
+        """
+        Calculate ghost positions for a potential move to (target_q, target_r).
+        Returns (ghost_positions, ejected_ghost)
+        ghost_positions: List of (q, r) for on-board ghosts.
+        ejected_ghost: (q, r) tuple if a marble is ejected, else None.
+        """
+        if not self.selected:
+            return [], None
+            
+        move_data, _ = self.validate_move(self.selected, target_q, target_r)
+        
+        if not move_data:
+            return [], None
+            
+        dq, dr = move_data['dir']
+        ghosts = []
+        ejected = None
+        
+        # Calculate new positions for own marbles
+        for mq, mr in move_data['marbles']:
+            nq, nr = mq + dq, mr + dr
+            if max(abs(nq), abs(nr), abs(-nq-nr)) <= 4:
+                ghosts.append((nq, nr))
+            else:
+                # Own marble ejected (Suicide - blocked by rule now, but good to handle)
+                pass 
+                
+        # Calculate new positions for opponent marbles (Push)
+        for oq, or_ in move_data['push_opponent']:
+            nq, nr = oq + dq, or_ + dr
+            if max(abs(nq), abs(nr), abs(-nq-nr)) <= 4:
+                ghosts.append((nq, nr))
+            else:
+                # Opponent ejected
+                ejected = (nq, nr)
+                
+        return ghosts, ejected

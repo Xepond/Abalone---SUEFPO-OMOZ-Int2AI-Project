@@ -197,20 +197,13 @@ def main():
         
         # Ghost Preview Logic
         ghost_positions = []
+        ejected_ghost = None
         if game_state == "GAME_RUNNING" and game_board.selected:
             mx, my = pygame.mouse.get_pos()
             hq, hr = board_ui.pixel_to_axial(mx, my)
             
-            # Check if hover target is valid (not same as selected, adjacent, etc.)
-            # We reuse validate_move logic
-            # validate_move returns (move_data, reason)
-            move_data, _ = game_board.validate_move(game_board.selected, hq, hr)
-            
-            if move_data:
-                dq, dr = move_data['dir']
-                # Calculate new positions for selected marbles
-                for mq, mr in move_data['marbles']:
-                    ghost_positions.append((mq + dq, mr + dr))
+            # Use new method
+            ghost_positions, ejected_ghost = game_board.get_ghost_positions(hq, hr)
         
         # Drawing
         screen.fill((0, 0, 0)) # Clear
@@ -238,7 +231,7 @@ def main():
             if current_notification and pygame.time.get_ticks() < notification_expiry:
                 notify_text = current_notification
             
-            board_ui.draw(draw_state, game_board.selected, debug=debug_mode, ui_data=ui_data, ghost_positions=ghost_positions, ghost_color=current_turn, notification_text=notify_text)
+            board_ui.draw(draw_state, game_board.selected, debug=debug_mode, ui_data=ui_data, ghost_positions=ghost_positions, ghost_color=current_turn, notification_text=notify_text, ejected_ghost=ejected_ghost)
             
             if game_state == "GAME_OVER":
                 restart_rect, exit_rect = board_ui.draw_game_over(winner)
