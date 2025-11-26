@@ -25,7 +25,9 @@ class Board:
 
     def handle_click(self, q, r, current_turn_color):
         """
-        Handle a click at (q, r). Returns True if a move was made, False otherwise.
+        Handle a click at (q, r). Returns (success, reason).
+        success: True if a move was made, False otherwise.
+        reason: String explaining why move failed, or None.
         """
         piece = self.grid.get((q, r))
         
@@ -38,29 +40,30 @@ class Board:
                 if len(self.selected) >= 3:
                     self.selected = []
                 self.selected.append((q, r))
-            return False
+            return False, None
             
         # Case 2: Clicked on empty or opponent -> Try Move
         elif self.selected:
-            move_data = self.validate_move(self.selected, q, r)
+            move_data, reason = self.validate_move(self.selected, q, r)
             if move_data:
                 self.apply_move(move_data)
                 self.selected = [] # Clear selection after move
-                return True
+                return True, None
             else:
                 # Invalid move, clear selection to be safe or just ignore
                 self.selected = []
-                return False
+                return False, reason
         
-        return False
+        return False, None
 
     def validate_move(self, selected, target_q, target_r):
         """
-        Validate move and return move_data dict if valid, else None.
-        move_data: {'type': 'inline'/'broadside', 'dir': (dq, dr), 'marbles': [], 'push_opponent': []}
+        Validate move and return (move_data, reason).
+        move_data: dict if valid, else None.
+        reason: String if invalid, else None.
         """
         if not selected:
-            return None
+            return None, "No marbles selected"
             
         # 1. Determine Direction
         # Target must be adjacent to at least one selected marble (Head)
@@ -81,7 +84,7 @@ class Board:
                 break
                 
         if dq is None:
-            return None # Target not adjacent
+            return None, "Target not adjacent"
             
         # 2. Classify Move Type
         
@@ -117,23 +120,26 @@ class Board:
         if not is_line and len(selected) > 1:
              # Should not happen if selection logic enforces adjacency, but for now we assume selection is valid
              # If they are not in a line, they can't move together usually
-             return None
+             return None, "Selection not linear"
 
-        # Broadside: Move direction != Line direction (and > 1 marble)
+            # Broadside: Move direction != Line direction (and > 1 marble)
         if len(selected) > 1 and (dq, dr) != line_dir and (dq, dr) != (-line_dir[0], -line_dir[1]):
             # Broadside
             # Rule: All destination cells must be empty
             for sq, sr in selected:
                 tq, tr = sq + dq, sr + dr
                 if (tq, tr) in self.grid:
-                    return None # Blocked
+                    return None, "Broadside blocked"
+                # Check for self-ejection
+                if max(abs(tq), abs(tr), abs(-tq-tr)) > 4:
+                    return None, "Cannot move off board"
             
             return {
                 'type': 'broadside',
                 'dir': (dq, dr),
                 'marbles': selected,
                 'push_opponent': []
-            }
+            }, None
             
         # In-Line: Move direction == Line direction (or opposite)
         else:
@@ -161,8 +167,16 @@ class Board:
                     chain.append(prev)
                     curr = prev
                 else:
-                    return None # Selected marbles not contiguous in move direction
+                    return None, "Selection broken"
             
+            # Check for self-ejection (Inline)
+            # We only need to check the head, because if the head stays on board, the ones behind it definitely will.
+            # But checking all is safer/simpler logic.
+            for mq, mr in chain:
+                nq, nr = mq + dq, mr + dr
+                if max(abs(nq), abs(nr), abs(-nq-nr)) > 4:
+                    return None, "Cannot move off board"
+
             # Now check target cell
             target_piece = self.grid.get((target_q, target_r))
             
@@ -173,11 +187,11 @@ class Board:
                     'dir': (dq, dr),
                     'marbles': chain,
                     'push_opponent': []
-                }
+                }, None
             
             elif target_piece.color == self.grid[head].color:
                 # Own marble -> Blocked
-                return None
+                return None, "Blocked by own marble"
                 
             else:
                 # Opponent -> Sumito Check
@@ -195,17 +209,17 @@ class Board:
                         
                 # Check strength
                 if len(chain) <= len(opponent_chain):
-                    return None # Too weak
+                    return None, f"Cannot push {len(opponent_chain)} vs {len(chain)}"
                     
                 if len(chain) > 3:
-                    return None # Can't push with > 3 (though selection limit is 3)
+                    return None, "Cannot push with > 3"
                     
                 # Check cell behind last opponent
                 behind_last = curr_op
                 p_behind = self.grid.get(behind_last)
                 
                 if p_behind:
-                    return None # Blocked by piece (own or opponent)
+                    return None, "Push blocked by piece"
                     
                 # Valid Push
                 return {
@@ -213,7 +227,7 @@ class Board:
                     'dir': (dq, dr),
                     'marbles': chain,
                     'push_opponent': opponent_chain
-                }
+                }, None
 
     def apply_move(self, move_data):
         """

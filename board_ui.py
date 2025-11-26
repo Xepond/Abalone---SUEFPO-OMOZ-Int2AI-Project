@@ -96,13 +96,15 @@ class BoardUI:
             
         return int(rx), int(ry)
 
-    def draw(self, board_state, selected_cells=[], debug=False, ui_data=None):
+    def draw(self, board_state, selected_cells=[], debug=False, ui_data=None, ghost_positions=None, ghost_color=None, notification_text=None):
         """
-        Draw the game board and marbles.
-        board_state: dict {(q, r): 'B' or 'W'}
-        selected_cells: list of (q, r) tuples
-        debug: bool, if True draw coordinate labels
-        ui_data: dict containing UI info (turn, scores, etc.)
+        Main draw function.
+        board_state: dict {(q, r): color_char}
+        selected_cells: list of (q, r)
+        ui_data: dict with 'current_turn', 'black_score', 'white_score', 'ai_status', 'last_move'
+        ghost_positions: list of (q, r) for ghost marbles
+        ghost_color: 'B' or 'W'
+        notification_text: String to display as toast message
         """
         # Draw Background
         if self.bg_image:
@@ -118,11 +120,15 @@ class BoardUI:
         # Draw Board Boundary
         self._draw_board_boundary()
         
-        # Draw Sockets (Empty cells)
+        # Draw Sockets (Grid)
         for q, r in self.valid_cells:
             x, y = self.axial_to_pixel(q, r)
             self._draw_socket(x, y, q, r, debug)
         
+        # Draw Ghosts
+        if ghost_positions and ghost_color:
+            self.draw_ghosts(ghost_positions, ghost_color)
+
         # Identify marbles currently animating to skip drawing their static state
         animating_keys = {anim['key'] for anim in self.animations}
         
@@ -155,6 +161,79 @@ class BoardUI:
             curr_y = start_y + (end_y - start_y) * t
             
             self._draw_marble(anim['color'], curr_x, curr_y) # No debug text for moving marbles
+
+        # Draw Notification Toast
+        if notification_text:
+            self.draw_notification(notification_text)
+
+    def draw_notification(self, text):
+        """
+        Draw a toast notification at the bottom of the screen.
+        """
+        screen_w = self.screen.get_width()
+        screen_h = self.screen.get_height()
+        
+        # Render text
+        text_surf = self.ui_font.render(text, True, (255, 255, 255))
+        padding_x, padding_y = 20, 10
+        width = text_surf.get_width() + padding_x * 2
+        height = text_surf.get_height() + padding_y * 2
+        
+        # Position: Bottom Center
+        x = (screen_w - width) // 2
+        y = screen_h - 100
+        
+        # Background Rect
+        s = pygame.Surface((width, height), pygame.SRCALPHA)
+        s.fill((50, 0, 0, 200)) # Semi-transparent Dark Red
+        
+        # Draw rounded rect on screen
+        # Since we want rounded corners with alpha, we can blit the surface then draw border?
+        # Or just draw rect on surface?
+        # Pygame's draw.rect supports border_radius on the target surface directly.
+        
+        # Let's draw directly on screen for simplicity with alpha
+        # Create a surface for the background
+        bg_surf = pygame.Surface((width, height), pygame.SRCALPHA)
+        pygame.draw.rect(bg_surf, (80, 0, 0, 220), bg_surf.get_rect(), border_radius=10)
+        
+        self.screen.blit(bg_surf, (x, y))
+        
+        # Blit text
+        text_rect = text_surf.get_rect(center=(x + width // 2, y + height // 2))
+        self.screen.blit(text_surf, text_rect)
+
+    def draw_ghosts(self, ghost_positions, color):
+        """
+        Draw semi-transparent ghost marbles.
+        """
+        img = self.black_marble if color == 'B' else self.white_marble
+        if not img:
+            return
+            
+        # Create ghost image with alpha
+        ghost_img = img.copy()
+        ghost_img.set_alpha(135) # Set to 150 as requested
+        
+        # Ring surface for Black marble fallback (faint white outline)
+        ring_surf = None
+        if color == 'B':
+            radius = int(self.hex_size * 0.85)
+            surf_size = radius * 2 + 4
+            ring_surf = pygame.Surface((surf_size, surf_size), pygame.SRCALPHA)
+            pygame.draw.circle(ring_surf, (200, 200, 200, 80), (surf_size // 2, surf_size // 2), radius, 1)
+
+        for q, r in ghost_positions:
+            x, y = self.axial_to_pixel(q, r)
+            
+            # Draw Ghost Marble
+            rect = ghost_img.get_rect(center=(x, y))
+            self.screen.blit(ghost_img, rect)
+            
+            # Draw faint ring for Black ghosts only
+            if ring_surf:
+                ring_rect = ring_surf.get_rect(center=(x, y))
+                self.screen.blit(ring_surf, ring_rect)
 
     def _draw_top_bar(self, ui_data):
         """

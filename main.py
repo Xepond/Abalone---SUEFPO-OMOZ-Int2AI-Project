@@ -2,6 +2,7 @@ import pygame
 import sys
 from board_ui import BoardUI
 from board import Board
+from menu import Menu
 
 # Constants
 SCREEN_WIDTH = 1200
@@ -26,7 +27,7 @@ def main():
     # Center the board
     board_ui = BoardUI(screen, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2, HEX_SIZE)
     
-    # Game State
+    # Game Board Logic
     game_board = Board()
     game_board.init_board()
     
@@ -34,12 +35,19 @@ def main():
     debug_mode = False
     last_move_str = "-"
     
-    game_state = "RUNNING" # RUNNING, GAME_OVER
+    game_state = "MENU_HOME" # MENU_HOME, MENU_MODE_SELECT, GAME_RUNNING, GAME_OVER
     winner = None
     
     # Button Rects (will be updated by draw_game_over)
     restart_rect = None
     exit_rect = None
+    
+    # Menu System
+    main_menu = Menu(SCREEN_WIDTH, SCREEN_HEIGHT)
+    
+    # Notification System
+    current_notification = None
+    notification_expiry = 0
     
     running = True
     while running:
@@ -49,22 +57,45 @@ def main():
                 running = False
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
-                    running = False
+                    if game_state == "GAME_RUNNING":
+                        game_state = "MENU_HOME" # Pause/Back to menu?
+                    else:
+                        running = False
                 elif event.key == pygame.K_SPACE:
                     # Manual trigger for test
                     pass
                 elif event.key == pygame.K_d:
                     debug_mode = not debug_mode
                     print(f"Debug Mode: {'ON' if debug_mode else 'OFF'}")
-            elif event.type == pygame.MOUSEBUTTONDOWN:
+            
+            # Mouse Events
+            if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1: # Left click
                     mouse_x, mouse_y = pygame.mouse.get_pos()
                     
-                    if game_state == "RUNNING":
+                    if game_state == "MENU_HOME":
+                        action = main_menu.handle_home_input(event)
+                        if action == "PLAY":
+                            game_state = "MENU_MODE_SELECT"
+                        elif action == "EXIT":
+                            running = False
+                            
+                    elif game_state == "MENU_MODE_SELECT":
+                        action = main_menu.handle_mode_select_input(event)
+                        if action == "VS_AI":
+                            print("Selected: Play vs AI")
+                            game_state = "GAME_RUNNING"
+                        elif action == "LOCAL":
+                            print("Selected: Local 2 Players")
+                            game_state = "GAME_RUNNING"
+                        elif action == "BACK":
+                            game_state = "MENU_HOME"
+                            
+                    elif game_state == "GAME_RUNNING":
                         q, r = board_ui.pixel_to_axial(mouse_x, mouse_y)
                         
                         # Handle click
-                        move_made = game_board.handle_click(q, r, current_turn)
+                        move_made, reason = game_board.handle_click(q, r, current_turn)
                         
                         if move_made:
                             # Switch turn
@@ -73,13 +104,7 @@ def main():
                             print(f"Move made. Turn: {current_turn}")
                             print(f"Score - Black: {game_board.black_score}, White: {game_board.white_score}")
                             
-                            # Check Game Over (Winner returned by apply_move, but apply_move was called inside handle_click)
-                            # Wait, handle_click calls apply_move. apply_move returns winner now.
-                            # But handle_click returns True/False.
-                            # We need to update handle_click to propagate the winner or check board state here.
-                            # Actually, let's just check board scores here or update handle_click.
-                            # Checking scores here is safer as apply_move return value is lost in handle_click.
-                            
+                            # Check Game Over
                             if game_board.white_score >= 6:
                                 game_state = "GAME_OVER"
                                 winner = "White"
@@ -88,6 +113,10 @@ def main():
                                 game_state = "GAME_OVER"
                                 winner = "Black"
                                 print("Black Wins!")
+                        elif reason:
+                            # Invalid move notification
+                            current_notification = reason
+                            notification_expiry = pygame.time.get_ticks() + 2000
                                 
                     elif game_state == "GAME_OVER":
                         # Check buttons
@@ -98,7 +127,7 @@ def main():
                             game_board.black_score = 0
                             game_board.white_score = 0
                             current_turn = 'B'
-                            game_state = "RUNNING"
+                            game_state = "GAME_RUNNING"
                             winner = None
                             last_move_str = "-"
                         elif exit_rect and exit_rect.collidepoint(mouse_x, mouse_y):
@@ -107,21 +136,51 @@ def main():
         # Update Animations
         board_ui.update_animations()
         
+        # Ghost Preview Logic
+        ghost_positions = []
+        if game_state == "GAME_RUNNING" and game_board.selected:
+            mx, my = pygame.mouse.get_pos()
+            hq, hr = board_ui.pixel_to_axial(mx, my)
+            
+            # Check if hover target is valid (not same as selected, adjacent, etc.)
+            # We reuse validate_move logic
+            # validate_move returns (move_data, reason)
+            move_data, _ = game_board.validate_move(game_board.selected, hq, hr)
+            
+            if move_data:
+                dq, dr = move_data['dir']
+                # Calculate new positions for selected marbles
+                for mq, mr in move_data['marbles']:
+                    ghost_positions.append((mq + dq, mr + dr))
+        
         # Drawing
-        draw_state = {pos: piece.color for pos, piece in game_board.grid.items()}
+        screen.fill((0, 0, 0)) # Clear
         
-        ui_data = {
-            'current_turn': current_turn,
-            'black_score': game_board.black_score,
-            'white_score': game_board.white_score,
-            'ai_status': 'Ready',
-            'last_move': last_move_str
-        }
-        
-        board_ui.draw(draw_state, game_board.selected, debug=debug_mode, ui_data=ui_data)
-        
-        if game_state == "GAME_OVER":
-            restart_rect, exit_rect = board_ui.draw_game_over(winner)
+        if game_state == "MENU_HOME":
+            main_menu.draw_home(screen)
+        elif game_state == "MENU_MODE_SELECT":
+            main_menu.draw_mode_select(screen)
+                
+        elif game_state in ["GAME_RUNNING", "GAME_OVER"]:
+            draw_state = {pos: piece.color for pos, piece in game_board.grid.items()}
+            
+            ui_data = {
+                'current_turn': current_turn,
+                'black_score': game_board.black_score,
+                'white_score': game_board.white_score,
+                'ai_status': 'Ready',
+                'last_move': last_move_str
+            }
+            
+            # Determine notification to show
+            notify_text = None
+            if current_notification and pygame.time.get_ticks() < notification_expiry:
+                notify_text = current_notification
+            
+            board_ui.draw(draw_state, game_board.selected, debug=debug_mode, ui_data=ui_data, ghost_positions=ghost_positions, ghost_color=current_turn, notification_text=notify_text)
+            
+            if game_state == "GAME_OVER":
+                restart_rect, exit_rect = board_ui.draw_game_over(winner)
         
         pygame.display.flip()
         clock.tick(FPS)
