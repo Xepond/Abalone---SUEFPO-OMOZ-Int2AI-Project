@@ -130,7 +130,7 @@ class Menu:
         self.btn_back = Button(50, 50, 100, 40, "Back", btn_color, btn_hover) # Top Left
         
         # AI Setup Components
-        self.carousel_algo = Carousel(cx - 150, screen_height // 3, 300, 50, ["Greedy", "ID Minimax", "Minimax"])
+        self.carousel_algo = Carousel(cx - 150, screen_height // 3, 300, 50, ["Greedy", "ID Minimax", "Minimax+ABP"])
         self.carousel_color = Carousel(cx - 150, screen_height // 2 + 50, 300, 50, ["Play as BLACK", "Play as WHITE"])
         self.btn_start = Button(cx - btn_width // 2, screen_height * 2 // 3 + 80, btn_width, btn_height, "START GAME", btn_color, btn_hover)
 

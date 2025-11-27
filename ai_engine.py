@@ -10,7 +10,9 @@ class AbaloneAI:
             'last_move_breakdown': {},
             'depth_history': [],
             'current_depth': 0,
-            'time_elapsed': 0
+            'time_elapsed': 0,
+            'cutoffs': 0,
+            'cache_hits': 0
         }
         # Weights for evaluation: [Material, Center Control, Cohesion, Mobility]
         # Currently simple material weight
@@ -22,6 +24,10 @@ class AbaloneAI:
         self.my_color = 'W' # Default
         
         self.position_history = [] # For repetition detection
+        
+        # Transposition Table
+        self.transposition_table = {}
+        self.tt_hits = 0
         
         # Precompute Center Scores
         self.center_scores = {}
@@ -69,9 +75,15 @@ class AbaloneAI:
             'last_move_breakdown': {},
             'depth_history': [],
             'current_depth': 0,
-            'time_elapsed': 0
+            'time_elapsed': 0,
+            'cutoffs': 0,
+            'cache_hits': 0
         }
         start_time = time.time()
+        
+        # Reset TT stats for this move (optional, or keep cumulative)
+        self.metrics['cache_hits'] = 0
+        self.metrics['cutoffs'] = 0
         
         best_move = None
         
@@ -79,6 +91,8 @@ class AbaloneAI:
             best_move = self._greedy_logic(board)
         elif self.algorithm_type in ["ID Minimax", "IDS"]:
             best_move = self._ids_logic(board, progress_callback)
+        elif self.algorithm_type == "Minimax+ABP":
+            best_move = self.champion_search(board, progress_callback)
         else:
             # Fallback or Not Implemented
             return None
@@ -190,6 +204,153 @@ class AbaloneAI:
             current_depth += 1
             
         return final_best_move
+
+    def champion_search(self, board, progress_callback=None):
+        """
+        Champion Algorithm: Time-Managed Minimax + Alpha-Beta Pruning.
+        """
+        final_best_move = None
+        start_time = time.time()
+        current_depth = 1
+        self.time_limit = 5.0 # Increased for Champion
+        
+        while True:
+            # Time Check
+            elapsed = time.time() - start_time
+            self.metrics['time_elapsed'] = elapsed
+            if elapsed > self.time_limit:
+                break
+                
+            self.metrics['current_depth'] = current_depth
+            time.sleep(0.1) # Visual visualization
+            
+            # Root Search
+            moves = self.get_ordered_moves(board, self.my_color)
+            
+            best_score = -math.inf
+            best_move_this_depth = None
+            alpha = -math.inf
+            beta = math.inf
+            
+            if not moves:
+                break
+                
+            timeout = False
+            for move in moves:
+                if time.time() - start_time > self.time_limit:
+                    timeout = True
+                    break
+                    
+                sim_board = self._clone_board(board)
+                sim_board.apply_move(move)
+                
+                score = self.minimax_ab(sim_board, current_depth - 1, alpha, beta, False, start_time, last_move=move, progress_callback=progress_callback)
+                
+                if score > best_score:
+                    best_score = score
+                    best_move_this_depth = move
+                
+                alpha = max(alpha, best_score)
+                
+            if timeout:
+                break
+                
+            self.metrics['current_depth'] = current_depth
+            self.metrics['score'] = best_score
+            self.metrics['depth_history'].append((current_depth, best_score))
+            
+            final_best_move = best_move_this_depth
+            
+            # Metrics update
+            if final_best_move:
+                sim_board = self._clone_board(board)
+                sim_board.apply_move(final_best_move)
+                _, breakdown = self.evaluate(sim_board, self.my_color, final_best_move, self.my_color)
+                self.metrics['last_move_breakdown'] = breakdown
+            
+            current_depth += 1
+            
+        return final_best_move
+
+    def minimax_ab(self, board, depth, alpha, beta, maximizing_player, start_time, last_move=None, progress_callback=None):
+        """
+        Minimax with Alpha-Beta Pruning and Transposition Table.
+        """
+        self.metrics['nodes_explored'] += 1
+        
+        # TT Lookup
+        state_key = self._get_state_key(board, maximizing_player)
+        if state_key in self.transposition_table:
+            entry = self.transposition_table[state_key]
+            if entry['depth'] >= depth:
+                if entry['flag'] == 'exact':
+                    self.metrics['cache_hits'] += 1
+                    return entry['score']
+                elif entry['flag'] == 'lower' and entry['score'] > alpha:
+                    alpha = entry['score']
+                elif entry['flag'] == 'upper' and entry['score'] < beta:
+                    beta = entry['score']
+                if alpha >= beta:
+                    self.metrics['cache_hits'] += 1
+                    return entry['score']
+
+        # Base Case
+        if depth == 0 or self._is_game_over(board):
+            maker_color = self._get_opponent_color(self.my_color) if maximizing_player else self.my_color
+            return self.evaluate(board, self.my_color, last_move, maker_color)[0]
+            
+        current_color = self.my_color if maximizing_player else self._get_opponent_color(self.my_color)
+        moves = self.get_ordered_moves(board, current_color)
+        
+        if not moves:
+             maker_color = self._get_opponent_color(self.my_color) if maximizing_player else self.my_color
+             return self.evaluate(board, self.my_color, last_move, maker_color)[0]
+
+        if maximizing_player:
+            max_eval = -math.inf
+            for move in moves:
+                # Time Check (Optimized: check every 100 nodes)
+                if self.metrics['nodes_explored'] % 100 == 0:
+                    if time.time() - start_time > self.time_limit:
+                        return max_eval # Return current best to unwind
+                
+                sim_board = self._clone_board(board)
+                sim_board.apply_move(move)
+                eval_val = self.minimax_ab(sim_board, depth - 1, alpha, beta, False, start_time, last_move=move, progress_callback=progress_callback)
+                max_eval = max(max_eval, eval_val)
+                alpha = max(alpha, eval_val)
+                if beta <= alpha:
+                    self.metrics['cutoffs'] += 1
+                    break
+            
+            # TT Store
+            flag = 'exact'
+            if max_eval <= alpha: flag = 'upper'
+            elif max_eval >= beta: flag = 'lower'
+            self.transposition_table[state_key] = {'score': max_eval, 'depth': depth, 'flag': flag}
+            return max_eval
+        else:
+            min_eval = math.inf
+            for move in moves:
+                if self.metrics['nodes_explored'] % 100 == 0:
+                    if time.time() - start_time > self.time_limit:
+                        return min_eval
+
+                sim_board = self._clone_board(board)
+                sim_board.apply_move(move)
+                eval_val = self.minimax_ab(sim_board, depth - 1, alpha, beta, True, start_time, last_move=move, progress_callback=progress_callback)
+                min_eval = min(min_eval, eval_val)
+                beta = min(beta, eval_val)
+                if beta <= alpha:
+                    self.metrics['cutoffs'] += 1
+                    break
+            
+            # TT Store
+            flag = 'exact'
+            if min_eval <= alpha: flag = 'upper'
+            elif min_eval >= beta: flag = 'lower'
+            self.transposition_table[state_key] = {'score': min_eval, 'depth': depth, 'flag': flag}
+            return min_eval
 
     def minimax_pure(self, board, depth, maximizing_player, start_time=None, last_move=None, progress_callback=None):
         """
@@ -333,7 +494,7 @@ class AbaloneAI:
         }
         
         return score, breakdown
-
+    
     def get_ordered_moves(self, board, color):
         """
         Get moves sorted by promise (captures/pushes first).

@@ -129,7 +129,7 @@ def main():
                             # Determine AI Difficulty
                             algo_str = result["algorithm"]
                             
-                            if "Greedy" not in algo_str and "ID Minimax" not in algo_str:
+                            if "Greedy" not in algo_str and "ID Minimax" not in algo_str and "Minimax+ABP" not in algo_str:
                                 current_notification = "Not Implemented Yet"
                                 notification_expiry = pygame.time.get_ticks() + 2000
                                 # Do not start game, stay in menu
@@ -137,6 +137,9 @@ def main():
                                 if "Greedy" in algo_str:
                                     ai_depth = 1 
                                     ai_algo_type = "Greedy"
+                                elif "Minimax+ABP" in algo_str:
+                                    ai_depth = 1 # Depth managed by time
+                                    ai_algo_type = "Minimax+ABP"
                                 else:
                                     ai_depth = 1
                                     ai_algo_type = "ID Minimax"

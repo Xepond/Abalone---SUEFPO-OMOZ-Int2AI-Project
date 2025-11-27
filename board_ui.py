@@ -373,12 +373,12 @@ class BoardUI:
         # Panel 1: Top Player's Graveyard (AI/P2 - White)
         # Position: Top-Left, x=30, y=120
         # Content: Captured Black marbles
-        self._draw_panel(30, 120, white_score, 'B', "P2: White")
+        self._draw_panel(30, 120, white_score, 'B', "P2: White Captured")
         
         # Panel 2: Bottom Player's Graveyard (User/P1 - Black)
         # Position: Bottom-Right, x=Width-230, y=Height-160
         # Content: Captured White marbles
-        self._draw_panel(screen_w - 230, screen_h - 160, black_score, 'W', "P1: Black")
+        self._draw_panel(screen_w - 230, screen_h - 160, black_score, 'W', "P1: Black Captured")
 
     def _draw_panel(self, x, y, captured_count, marble_color, label=""):
         """
@@ -733,6 +733,35 @@ class BoardUI:
                 self.screen.blit(s_surf, (x + 100, curr_y))
                 curr_y += 15
             
+        elif algo == "Minimax+ABP":
+            draw_line("Depth Reached", metrics.get('current_depth', 0))
+            draw_line("Nodes Visited", metrics.get('nodes_explored', 0))
+            draw_line("Pruning Count", metrics.get('cutoffs', 0), (255, 100, 100))
+            draw_line("Cache Hits", metrics.get('cache_hits', 0), (100, 255, 100))
+            
+            # Progress Bar for Time
+            curr_y += 20
+            bar_w = 200
+            bar_h = 10
+            pygame.draw.rect(self.screen, (50, 50, 50), (x + 25, curr_y, bar_w, bar_h))
+            
+            limit = 5.0 # 5s for Champion
+            elapsed = metrics.get('time_elapsed', 0)
+            progress = min(elapsed / limit, 1.0)
+            fill_w = int(progress * bar_w)
+            
+            if progress < 0.5:
+                bar_color = (0, 255, 0)
+            elif progress < 0.8:
+                bar_color = (255, 255, 0)
+            else:
+                bar_color = (255, 50, 50)
+                
+            pygame.draw.rect(self.screen, bar_color, (x + 25, curr_y, fill_w, bar_h))
+            
+            lbl = self.ui_font_small.render(f"Time: {elapsed:.1f}s", True, (150, 150, 150))
+            self.screen.blit(lbl, (x + 25, curr_y - 15))
+
         elif algo == "Minimax":
             draw_line("Depth", metrics.get('depth_reached', 3)) # Fixed depth usually
             draw_line("Nodes Visited", metrics.get('nodes_explored', 0))
