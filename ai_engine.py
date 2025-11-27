@@ -7,7 +7,10 @@ class AbaloneAI:
         self.metrics = {
             'nodes_explored': 0,
             'execution_time': 0,
-            'last_move_breakdown': {}
+            'last_move_breakdown': {},
+            'depth_history': [],
+            'current_depth': 0,
+            'time_elapsed': 0
         }
         # Weights for evaluation: [Material, Center Control, Cohesion, Mobility]
         # Currently simple material weight
@@ -63,7 +66,10 @@ class AbaloneAI:
         self.metrics = {
             'nodes_explored': 0,
             'execution_time': 0,
-            'last_move_breakdown': {}
+            'last_move_breakdown': {},
+            'depth_history': [],
+            'current_depth': 0,
+            'time_elapsed': 0
         }
         start_time = time.time()
         
@@ -71,6 +77,8 @@ class AbaloneAI:
         
         if self.algorithm_type == "Greedy":
             best_move = self._greedy_logic(board)
+        elif self.algorithm_type in ["ID Minimax", "IDS"]:
+            best_move = self._ids_logic(board, progress_callback)
         else:
             # Fallback or Not Implemented
             return None
@@ -94,7 +102,7 @@ class AbaloneAI:
             sim_board = self._clone_board(board)
             sim_board.apply_move(move)
             # Pass move to evaluate for Aggression score
-            score, breakdown = self.evaluate(sim_board, self.my_color, move)
+            score, breakdown = self.evaluate(sim_board, self.my_color, move, self.my_color)
             
             # Repetition Check
             sim_hash = self._get_board_hash(sim_board)
@@ -111,9 +119,133 @@ class AbaloneAI:
         self.metrics['last_move_breakdown'] = best_breakdown
         return best_move
 
+    def _ids_logic(self, board, progress_callback=None):
+        """
+        Iterative Deepening Search.
+        """
+        final_best_move = None
+        start_time = time.time()
+        current_depth = 1
+        
+        while True:
+            # Time Check
+            elapsed = time.time() - start_time
+            self.metrics['time_elapsed'] = elapsed
+            if elapsed > self.time_limit:
+                break
+            
+            # Update depth immediately so UI shows it
+            self.metrics['current_depth'] = current_depth
+            
+            # Visual Slowdown
+            time.sleep(0.1)
+                
+            # Root Search for this depth
+            moves = self.get_all_legal_moves(board, self.my_color)
+            random.shuffle(moves) # Add randomness
+            
+            best_score = -math.inf
+            best_move_this_depth = None
+            
+            # If no moves, break
+            if not moves:
+                break
+                
+            timeout = False
+            for move in moves:
+                # Check time inside the loop too for finer granularity
+                if time.time() - start_time > self.time_limit:
+                    timeout = True
+                    break
+                    
+                sim_board = self._clone_board(board)
+                sim_board.apply_move(move)
+                
+                # Call pure minimax
+                score = self.minimax_pure(sim_board, current_depth - 1, False, start_time, last_move=move, progress_callback=progress_callback)
+                
+                if score > best_score:
+                    best_score = score
+                    best_move_this_depth = move
+            
+            if timeout:
+                break
+                
+            # Completed depth successfully
+            self.metrics['current_depth'] = current_depth
+            self.metrics['score'] = best_score
+            # Store history: (depth, score) - simplified for UI
+            self.metrics['depth_history'].append((current_depth, best_score))
+            
+            final_best_move = best_move_this_depth
+            
+            # Detailed Metrics Calculation for ID Minimax
+            if final_best_move:
+                sim_board = self._clone_board(board)
+                sim_board.apply_move(final_best_move)
+                # Get breakdown
+                _, breakdown = self.evaluate(sim_board, self.my_color, final_best_move, self.my_color)
+                self.metrics['last_move_breakdown'] = breakdown
+            
+            current_depth += 1
+            
+        return final_best_move
 
+    def minimax_pure(self, board, depth, maximizing_player, start_time=None, last_move=None, progress_callback=None):
+        """
+        Inefficient Recursive Engine (Pure Minimax).
+        No Alpha-Beta, No Cache.
+        """
+        self.metrics['nodes_explored'] += 1
+        
+        # Check time occasionally to abort deep searches if needed
+        # But strict pure minimax usually runs to completion or we handle timeout at root.
+        # However, if we want to break out of a deep recursion on timeout:
+        if start_time and (self.metrics['nodes_explored'] % 100 == 0):
+             elapsed = time.time() - start_time
+             self.metrics['time_elapsed'] = elapsed
+             
+             if progress_callback:
+                 progress_callback()
+                 
+             if elapsed > self.time_limit:
+                 # We can't easily raise exception without catching it everywhere or handling it.
+                 # For simplicity, let's just return a heuristic value to finish quickly,
+                 # but the root loop checks time.
+                 pass
 
-    def evaluate(self, board, player_color, move=None):
+        if depth == 0 or self._is_game_over(board):
+            # Determine who made the last move for evaluation
+            # If maximizing_player is True (It's MY turn), then the LAST move was made by OPPONENT.
+            # If maximizing_player is False (It's OPPONENT'S turn), then the LAST move was made by ME.
+            maker_color = self._get_opponent_color(self.my_color) if maximizing_player else self.my_color
+            return self.evaluate(board, self.my_color, last_move, maker_color)[0]
+            
+        current_color = self.my_color if maximizing_player else self._get_opponent_color(self.my_color)
+        moves = self.get_all_legal_moves(board, current_color)
+        
+        if not moves:
+             maker_color = self._get_opponent_color(self.my_color) if maximizing_player else self.my_color
+             return self.evaluate(board, self.my_color, last_move, maker_color)[0]
+             
+        if maximizing_player:
+            max_eval = -math.inf
+            for move in moves:
+                sim_board = self._clone_board(board)
+                sim_board.apply_move(move)
+                eval_val = self.minimax_pure(sim_board, depth - 1, False, start_time, last_move=move, progress_callback=progress_callback)
+                max_eval = max(max_eval, eval_val)
+            return max_eval
+        else:
+            min_eval = math.inf
+            for move in moves:
+                sim_board = self._clone_board(board)
+                sim_board.apply_move(move)
+                eval_val = self.minimax_pure(sim_board, depth - 1, True, start_time, last_move=move, progress_callback=progress_callback)
+                min_eval = min(min_eval, eval_val)
+            return min_eval
+
+    def evaluate(self, board, player_color, move=None, move_maker_color=None):
         """
         Heuristic evaluation. Returns (score, breakdown_dict).
         Optimized for speed.
@@ -165,7 +297,13 @@ class AbaloneAI:
         # Aggression (Pushing)
         if move and move.get('push_opponent'):
             # Bonus for pushing
-            aggression_score = len(move['push_opponent']) * 2
+            base_agg = len(move['push_opponent']) * 2
+            
+            # If I made the move, it's good. If opponent made it, it's bad (for me).
+            if move_maker_color == player_color:
+                aggression_score = base_agg
+            elif move_maker_color:
+                aggression_score = -base_agg
             
             # Extra bonus if pushing towards edge?
             # Complex to calc, skip for now to keep speed

@@ -129,13 +129,17 @@ def main():
                             # Determine AI Difficulty
                             algo_str = result["algorithm"]
                             
-                            if "Greedy" not in algo_str:
+                            if "Greedy" not in algo_str and "ID Minimax" not in algo_str:
                                 current_notification = "Not Implemented Yet"
                                 notification_expiry = pygame.time.get_ticks() + 2000
                                 # Do not start game, stay in menu
                             else:
-                                ai_depth = 1 
-                                ai_algo_type = "Greedy"
+                                if "Greedy" in algo_str:
+                                    ai_depth = 1 
+                                    ai_algo_type = "Greedy"
+                                else:
+                                    ai_depth = 1
+                                    ai_algo_type = "ID Minimax"
                                 
                                 # Determine Player Color
                                 player_color_str = result["color"]
@@ -248,7 +252,8 @@ def main():
         # Ghost Preview Logic
         ghost_positions = []
         ejected_ghost = None
-        if game_state == "GAME_RUNNING" and game_board.selected:
+        # Only show user ghosts if AI is not visualizing/thinking and it's user's turn (or free play)
+        if game_state == "GAME_RUNNING" and game_board.selected and not ai_visualizing and not ai_thinking:
             mx, my = pygame.mouse.get_pos()
             hq, hr = board_ui.pixel_to_axial(mx, my)
             
@@ -302,6 +307,9 @@ def main():
                 ai_visualizing = True
                 ai_move_timer = pygame.time.get_ticks() + 1500 # 1.5 seconds delay
                 
+                # Highlight AI Selection
+                game_board.selected = best_move['marbles']
+                
                 # Pass ghost positions to board for rendering
                 # We need to calculate ghost positions from the move
                 # best_move has 'marbles' (list of (q,r)) and 'dir' (dq, dr)
@@ -351,6 +359,9 @@ def main():
                     
                 board_ui.start_move_animation(anim_data)
                 game_board.apply_move(best_move)
+                
+                # Clear Selection
+                game_board.selected = []
                 
                 # Record History for Repetition Detection
                 ai_engine.update_history(game_board)

@@ -203,6 +203,7 @@ class BoardUI:
             self._draw_marble(color, x, y, q, r, debug)
             
         # Draw Selection Rings
+        # Renders selection highlight for both Human and AI (when board.selected is set)
         for q, r in selected_cells:
             x, y = self.axial_to_pixel(q, r)
             # Draw Cyan/Gold ring
@@ -683,10 +684,9 @@ class BoardUI:
             else:
                 draw_line("Status", "No Move Yet")
                 
-        elif algo == "ID Minimax":
-            draw_line("Depth Reached", metrics.get('current_depth', 0)) # Use current_depth
+        elif algo in ["ID Minimax", "IDS"]:
+            draw_line("Depth Reached", metrics.get('current_depth', 0))
             draw_line("Nodes Visited", metrics.get('nodes_explored', 0))
-            # draw_line("Cutoffs", metrics.get('cutoffs', 0)) # Pure minimax has no cutoffs
             
             # Progress Bar for Time
             curr_y += 20
@@ -694,35 +694,44 @@ class BoardUI:
             bar_h = 10
             pygame.draw.rect(self.screen, (50, 50, 50), (x + 25, curr_y, bar_w, bar_h))
             
-            # Assuming 3s limit
             limit = 3.0
             elapsed = metrics.get('time_elapsed', 0)
             progress = min(elapsed / limit, 1.0)
             fill_w = int(progress * bar_w)
             
-            # Dynamic Color
             if progress < 0.5:
-                bar_color = (0, 255, 0) # Green
+                bar_color = (0, 255, 0)
             elif progress < 0.8:
-                bar_color = (255, 255, 0) # Yellow
+                bar_color = (255, 255, 0)
             else:
-                bar_color = (255, 50, 50) # Red
+                bar_color = (255, 50, 50)
                 
             pygame.draw.rect(self.screen, bar_color, (x + 25, curr_y, fill_w, bar_h))
             
             lbl = self.ui_font_small.render(f"Time: {elapsed:.1f}s", True, (150, 150, 150))
             self.screen.blit(lbl, (x + 25, curr_y - 15))
             
-            # Show Breakdown for ID Minimax too
+            # Evolution History Table
             curr_y += 20
-            breakdown = metrics.get('last_move_breakdown', {})
-            if breakdown:
-                draw_line("Material", f"{breakdown.get('Material', 0):.1f}")
-                draw_line("Aggression", f"{breakdown.get('Aggression', 0):.1f}")
-                draw_line("Cohesion", f"{breakdown.get('Cohesion', 0):.1f}")
-                draw_line("Center", f"{breakdown.get('Center', 0):.1f}")
-                draw_line("Danger", f"{breakdown.get('Danger', 0):.1f}", (255, 100, 100))
-                draw_line("TOTAL", f"{breakdown.get('Total', 0):.1f}", (0, 255, 0))
+            hist_header = self.ui_font_small.render("Evolution History", True, (255, 200, 0))
+            self.screen.blit(hist_header, (x + 10, curr_y))
+            curr_y += 20
+            
+            # Table Headers
+            h1 = self.ui_font_small.render("Depth", True, (150, 150, 150))
+            h2 = self.ui_font_small.render("Score", True, (150, 150, 150))
+            self.screen.blit(h1, (x + 10, curr_y))
+            self.screen.blit(h2, (x + 100, curr_y))
+            curr_y += 15
+            
+            history = metrics.get('depth_history', [])
+            # Show last 5 entries
+            for d, s in history[-5:]:
+                d_surf = self.ui_font_small.render(str(d), True, (200, 200, 200))
+                s_surf = self.ui_font_small.render(f"{s:.1f}", True, (200, 200, 200))
+                self.screen.blit(d_surf, (x + 10, curr_y))
+                self.screen.blit(s_surf, (x + 100, curr_y))
+                curr_y += 15
             
         elif algo == "Minimax":
             draw_line("Depth", metrics.get('depth_reached', 3)) # Fixed depth usually
