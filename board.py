@@ -277,6 +277,16 @@ class Board:
             
         return None
 
+    def clone(self):
+        """
+        Create a fast shallow copy of the board for AI simulation.
+        """
+        new_board = Board()
+        new_board.grid = self.grid.copy() 
+        new_board.white_score = self.white_score
+        new_board.black_score = self.black_score
+        return new_board
+
     def init_board(self, top_color='W', bottom_color='B'):
         """
         Initialize the standard Abalone board setup.
@@ -334,16 +344,20 @@ class Board:
         for mq, mr in move_data['marbles']:
             nq, nr = mq + dq, mr + dr
             if max(abs(nq), abs(nr), abs(-nq-nr)) <= 4:
-                ghosts.append((nq, nr))
+                # Get color of the moving marble
+                color = self.grid.get((mq, mr)).color
+                ghosts.append((nq, nr, color))
             else:
-                # Own marble ejected (Suicide - blocked by rule now, but good to handle)
+                # Own marble ejected
                 pass 
                 
         # Calculate new positions for opponent marbles (Push)
         for oq, or_ in move_data['push_opponent']:
             nq, nr = oq + dq, or_ + dr
             if max(abs(nq), abs(nr), abs(-nq-nr)) <= 4:
-                ghosts.append((nq, nr))
+                # Get color of the pushed marble
+                color = self.grid.get((oq, or_)).color
+                ghosts.append((nq, nr, color))
             else:
                 # Opponent ejected
                 ejected = (nq, nr)

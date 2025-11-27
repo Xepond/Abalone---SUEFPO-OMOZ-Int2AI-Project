@@ -16,6 +16,16 @@ class BoardUI:
             print("Warning: assets/wood_table.png not found. Using default color.")
             self.bg_image = None
 
+        # Developer Mode Assets
+        self.show_debug_metrics = False
+        self.toggle_rect = pygame.Rect(self.screen.get_width() - 160, 10, 140, 30)
+        try:
+            self.dev_bg_image = pygame.image.load("assets/dev_mode_bg.png").convert()
+            self.dev_bg_image = pygame.transform.scale(self.dev_bg_image, self.screen.get_size())
+        except FileNotFoundError:
+            print("Warning: assets/dev_mode_bg.png not found.")
+            self.dev_bg_image = None
+
         # Marble setup
         # Hex width (pointy) is sqrt(3)*size. Height is 2*size.
         # We want marbles to fit nicely.
@@ -150,7 +160,9 @@ class BoardUI:
         ejected_ghost: (q, r) tuple if a marble is ejected
         """
         # Draw Background
-        if self.bg_image:
+        if self.show_debug_metrics and self.dev_bg_image:
+            self.screen.blit(self.dev_bg_image, (0, 0))
+        elif self.bg_image:
             self.screen.blit(self.bg_image, (0, 0))
         else:
             self.screen.fill((30, 30, 30)) # Fallback dark gray
@@ -159,6 +171,13 @@ class BoardUI:
         if ui_data:
             self._draw_top_bar(ui_data)
             self._draw_score_panels(ui_data.get('black_score', 0), ui_data.get('white_score', 0))
+            
+        # Draw Developer Mode Toggle
+        self._draw_toggle_switch()
+        
+        # Draw Dashboard if enabled
+        if self.show_debug_metrics and ui_data:
+            self._draw_dashboard(ui_data)
 
         # Draw Board Boundary
         self._draw_board_boundary()
@@ -170,7 +189,7 @@ class BoardUI:
         
         # Draw Ghosts
         if ghost_positions or ejected_ghost:
-            self.draw_ghosts(ghost_positions, ghost_color, ejected_ghost)
+            self.draw_ghosts(ghost_positions, ejected_ghost)
 
         # Identify marbles currently animating to skip drawing their static state
         animating_keys = {anim['key'] for anim in self.animations}
@@ -246,36 +265,32 @@ class BoardUI:
         text_rect = text_surf.get_rect(center=(x + width // 2, y + height // 2))
         self.screen.blit(text_surf, text_rect)
 
-    def draw_ghosts(self, ghost_positions, color, ejected_ghost=None):
+    def draw_ghosts(self, ghost_positions, ejected_ghost=None):
         """
         Draw semi-transparent ghost marbles.
+        ghost_positions: List of (q, r, color)
         """
-        img = self.black_marble if color == 'B' else self.white_marble
-        if not img:
-            return
+        for q, r, color in ghost_positions:
+            img = self.black_marble if color == 'B' else self.white_marble
+            if not img:
+                continue
+                
+            # Create ghost image with alpha
+            ghost_img = img.copy()
+            ghost_img.set_alpha(135) 
             
-        # Create ghost image with alpha
-        ghost_img = img.copy()
-        ghost_img.set_alpha(135) # Set to 150 as requested
-        
-        # Ring surface for Black marble fallback (faint white outline)
-        ring_surf = None
-        if color == 'B':
-            radius = int(self.hex_size * 0.85)
-            surf_size = radius * 2 + 4
-            ring_surf = pygame.Surface((surf_size, surf_size), pygame.SRCALPHA)
-            pygame.draw.circle(ring_surf, (200, 200, 200, 80), (surf_size // 2, surf_size // 2), radius, 1)
-
-        # Draw Normal Ghosts
-        for q, r in ghost_positions:
             x, y = self.axial_to_pixel(q, r)
             
             # Draw Ghost Marble
             rect = ghost_img.get_rect(center=(x, y))
             self.screen.blit(ghost_img, rect)
             
-            # Draw faint ring for Black ghosts only
-            if ring_surf:
+            # Ring surface for Black marble fallback (faint white outline)
+            if color == 'B':
+                radius = int(self.hex_size * 0.85)
+                surf_size = radius * 2 + 4
+                ring_surf = pygame.Surface((surf_size, surf_size), pygame.SRCALPHA)
+                pygame.draw.circle(ring_surf, (200, 200, 200, 80), (surf_size // 2, surf_size // 2), radius, 1)
                 ring_rect = ring_surf.get_rect(center=(x, y))
                 self.screen.blit(ring_surf, ring_rect)
 
@@ -588,3 +603,129 @@ class BoardUI:
             self.screen.blit(text_surf, text_rect)
 
 
+
+    def _draw_toggle_switch(self):
+        """
+        Draw the Developer Mode toggle switch.
+        """
+        # Background
+        color = (0, 200, 0) if self.show_debug_metrics else (100, 100, 100)
+        pygame.draw.rect(self.screen, color, self.toggle_rect, border_radius=15)
+        
+        # Knob
+        knob_x = self.toggle_rect.right - 25 if self.show_debug_metrics else self.toggle_rect.left + 5
+        knob_rect = pygame.Rect(knob_x, self.toggle_rect.top + 5, 20, 20)
+        pygame.draw.ellipse(self.screen, (255, 255, 255), knob_rect)
+        
+        # Label
+        label = "DEV MODE"
+        text_surf = self.debug_font.render(label, True, (255, 255, 255))
+        text_rect = text_surf.get_rect(center=(self.toggle_rect.centerx, self.toggle_rect.bottom + 10))
+        self.screen.blit(text_surf, text_rect)
+
+    def _draw_dashboard(self, ui_data):
+        """
+        Draw the metrics dashboard on the right side.
+        """
+        metrics = ui_data.get('ai_metrics', {})
+        algo = ui_data.get('ai_algo', 'Unknown')
+        
+        panel_w = 250
+        panel_h = 400
+        x = self.screen.get_width() - panel_w - 20
+        y = 100
+        
+        # Panel Background
+        s = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
+        s.fill((0, 20, 40, 230)) # Dark Blue semi-transparent
+        self.screen.blit(s, (x, y))
+        
+        # Border
+        pygame.draw.rect(self.screen, (0, 255, 255), (x, y, panel_w, panel_h), 2)
+        
+        # Title
+        title_surf = self.ui_font.render(f"AI METRICS ({algo})", True, (0, 255, 255))
+        self.screen.blit(title_surf, (x + 10, y + 10))
+        
+        curr_y = y + 50
+        line_height = 25
+        
+        def draw_line(label, value, color=(200, 200, 200)):
+            nonlocal curr_y
+            lbl_surf = self.ui_font_small.render(f"{label}:", True, (150, 150, 150))
+            val_surf = self.ui_font_small.render(str(value), True, color)
+            self.screen.blit(lbl_surf, (x + 10, curr_y))
+            self.screen.blit(val_surf, (x + 150, curr_y))
+            curr_y += line_height
+
+        # Common Metrics
+        draw_line("Exec Time", f"{metrics.get('execution_time', 0):.4f}s")
+        
+        if algo == "Greedy":
+            curr_y += 10
+            header_surf = self.ui_font.render("Score Breakdown", True, (255, 200, 0))
+            self.screen.blit(header_surf, (x + 10, curr_y))
+            curr_y += 30
+            
+            breakdown = metrics.get('last_move_breakdown', {})
+            if breakdown:
+                draw_line("Material", f"{breakdown.get('Material', 0):.1f}")
+                draw_line("Aggression", f"{breakdown.get('Aggression', 0):.1f}")
+                draw_line("Cohesion", f"{breakdown.get('Cohesion', 0):.1f}")
+                draw_line("Center", f"{breakdown.get('Center', 0):.1f}")
+                draw_line("Danger", f"{breakdown.get('Danger', 0):.1f}", (255, 100, 100))
+                
+                if 'Repetition' in breakdown:
+                     draw_line("Repetition", f"{breakdown.get('Repetition', 0):.1f}", (255, 0, 0))
+
+                curr_y += 10
+                draw_line("TOTAL", f"{breakdown.get('Total', 0):.1f}", (0, 255, 0))
+            else:
+                draw_line("Status", "No Move Yet")
+                
+        elif algo == "ID Minimax":
+            draw_line("Depth Reached", metrics.get('current_depth', 0)) # Use current_depth
+            draw_line("Nodes Visited", metrics.get('nodes_explored', 0))
+            # draw_line("Cutoffs", metrics.get('cutoffs', 0)) # Pure minimax has no cutoffs
+            
+            # Progress Bar for Time
+            curr_y += 20
+            bar_w = 200
+            bar_h = 10
+            pygame.draw.rect(self.screen, (50, 50, 50), (x + 25, curr_y, bar_w, bar_h))
+            
+            # Assuming 3s limit
+            limit = 3.0
+            elapsed = metrics.get('time_elapsed', 0)
+            progress = min(elapsed / limit, 1.0)
+            fill_w = int(progress * bar_w)
+            
+            # Dynamic Color
+            if progress < 0.5:
+                bar_color = (0, 255, 0) # Green
+            elif progress < 0.8:
+                bar_color = (255, 255, 0) # Yellow
+            else:
+                bar_color = (255, 50, 50) # Red
+                
+            pygame.draw.rect(self.screen, bar_color, (x + 25, curr_y, fill_w, bar_h))
+            
+            lbl = self.ui_font_small.render(f"Time: {elapsed:.1f}s", True, (150, 150, 150))
+            self.screen.blit(lbl, (x + 25, curr_y - 15))
+            
+            # Show Breakdown for ID Minimax too
+            curr_y += 20
+            breakdown = metrics.get('last_move_breakdown', {})
+            if breakdown:
+                draw_line("Material", f"{breakdown.get('Material', 0):.1f}")
+                draw_line("Aggression", f"{breakdown.get('Aggression', 0):.1f}")
+                draw_line("Cohesion", f"{breakdown.get('Cohesion', 0):.1f}")
+                draw_line("Center", f"{breakdown.get('Center', 0):.1f}")
+                draw_line("Danger", f"{breakdown.get('Danger', 0):.1f}", (255, 100, 100))
+                draw_line("TOTAL", f"{breakdown.get('Total', 0):.1f}", (0, 255, 0))
+            
+        elif algo == "Minimax":
+            draw_line("Depth", metrics.get('depth_reached', 3)) # Fixed depth usually
+            draw_line("Nodes Visited", metrics.get('nodes_explored', 0))
+            draw_line("Pruning Count", metrics.get('cutoffs', 0), (255, 100, 100))
+            draw_line("Cache Hits", metrics.get('cache_hits', 0), (100, 255, 100))
