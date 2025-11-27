@@ -29,9 +29,27 @@ class AbaloneAI:
         self.transposition_table = {}
         self.tt_hits = 0
         
+        # Zobrist Hashing Initialization
+        self.zobrist_table = {}
+        self.turn_hash = random.getrandbits(64)
+        self._init_zobrist()
+        
         # Precompute Center Scores
         self.center_scores = {}
         self._precompute_center_scores()
+
+    def _init_zobrist(self):
+        """
+        Initialize Zobrist table with random 64-bit integers.
+        """
+        # Board range is roughly -4 to 4, but let's cover all possible keys
+        # We'll use a dictionary for sparse storage or just generate on fly? 
+        # Better to precompute for speed.
+        pieces = ['B', 'W']
+        for q in range(-9, 10): # Generous range
+            for r in range(-9, 10):
+                for p in pieces:
+                    self.zobrist_table[(q, r, p)] = random.getrandbits(64)
 
     def _precompute_center_scores(self):
         """
@@ -64,6 +82,21 @@ class AbaloneAI:
         self.max_depth = max_depth
         self.time_limit = time_limit
         self.my_color = my_color
+        
+        # Set Algorithm-Specific Weights
+        # [Material, Push, Cohesion, Center, Danger]
+        if self.algorithm_type == "Greedy":
+            # Aggressive Scavenger
+            self.weights = [10000, 200, 10, 3, -250]
+        elif self.algorithm_type in ["ID Minimax", "IDS"]:
+            # Balanced Strategist
+            self.weights = [10000, 100, 20, 50, -50]
+        elif self.algorithm_type == "Minimax+ABP":
+            # The Champion (Same as IDS for now)
+            self.weights = [10000, 100, 20, 50, -50]
+        else:
+            # Default fallback
+            self.weights = [10000, 100, 10, 20, -100]
         
     def get_best_move(self, board, progress_callback=None):
         """
@@ -272,6 +305,78 @@ class AbaloneAI:
             
         return final_best_move
 
+    def get_noisy_moves(self, board, color):
+        """
+        Get only tactical moves (Sumito/Push) for Quiescence Search.
+        """
+        moves = []
+        all_moves = self.get_all_legal_moves(board, color)
+        for move in all_moves:
+            if move['push_opponent']:
+                moves.append(move)
+        return moves
+
+    def quiescence_search(self, board, alpha, beta, maximizing_player, q_depth=2):
+        """
+        Quiescence Search to mitigate Horizon Effect.
+        Searches only noisy moves (pushes) to reach a stable state.
+        """
+        self.metrics['nodes_explored'] += 1
+        
+        # 1. Stand-Pat (Static Evaluation)
+        maker_color = self._get_opponent_color(self.my_color) if maximizing_player else self.my_color
+        stand_pat = self.evaluate(board, self.my_color, None, maker_color)[0]
+        
+        if maximizing_player:
+            if stand_pat >= beta:
+                return beta
+            if stand_pat > alpha:
+                alpha = stand_pat
+        else:
+            if stand_pat <= alpha:
+                return alpha
+            if stand_pat < beta:
+                beta = stand_pat
+                
+        # 2. Depth Limit
+        if q_depth == 0:
+            return stand_pat
+            
+        # 3. Search Noisy Moves
+        current_color = self.my_color if maximizing_player else self._get_opponent_color(self.my_color)
+        moves = self.get_noisy_moves(board, current_color)
+        
+        if not moves:
+            return stand_pat
+            
+        # Move Ordering (Crucial for QS)
+        def move_priority(move):
+            return len(move['push_opponent'])
+        moves.sort(key=move_priority, reverse=True)
+        
+        if maximizing_player:
+            for move in moves:
+                sim_board = self._clone_board(board)
+                sim_board.apply_move(move)
+                score = self.quiescence_search(sim_board, alpha, beta, False, q_depth - 1)
+                
+                if score >= beta:
+                    return beta
+                if score > alpha:
+                    alpha = score
+            return alpha
+        else:
+            for move in moves:
+                sim_board = self._clone_board(board)
+                sim_board.apply_move(move)
+                score = self.quiescence_search(sim_board, alpha, beta, True, q_depth - 1)
+                
+                if score <= alpha:
+                    return alpha
+                if score < beta:
+                    beta = score
+            return beta
+
     def minimax_ab(self, board, depth, alpha, beta, maximizing_player, start_time, last_move=None, progress_callback=None):
         """
         Minimax with Alpha-Beta Pruning and Transposition Table.
@@ -296,8 +401,8 @@ class AbaloneAI:
 
         # Base Case
         if depth == 0 or self._is_game_over(board):
-            maker_color = self._get_opponent_color(self.my_color) if maximizing_player else self.my_color
-            return self.evaluate(board, self.my_color, last_move, maker_color)[0]
+            # Use Quiescence Search at leaf nodes instead of raw eval
+            return self.quiescence_search(board, alpha, beta, maximizing_player)
             
         current_color = self.my_color if maximizing_player else self._get_opponent_color(self.my_color)
         moves = self.get_ordered_moves(board, current_color)
@@ -469,12 +574,13 @@ class AbaloneAI:
             # Extra bonus if pushing towards edge?
             # Complex to calc, skip for now to keep speed
         
-        # Weights (Tuned)
-        w_mat = 10000   # Material is King (increased to avoid trading mistake)
-        w_agg = 500     # Aggression (Pushing)
-        w_coh = 10      # Cohesion (Group safety)
-        w_cen = 20      # Center Control
-        w_danger = -100 # Danger Penalty
+        # Weights (Dynamic)
+        # [Material, Push, Cohesion, Center, Danger]
+        w_mat = self.weights[0]
+        w_agg = self.weights[1]
+        w_coh = self.weights[2]
+        w_cen = self.weights[3]
+        w_danger = self.weights[4]
         
         total_material = material_diff * w_mat
         total_aggression = aggression_score * w_agg
@@ -599,8 +705,20 @@ class AbaloneAI:
         return board.white_score >= 6 or board.black_score >= 6
 
     def _get_state_key(self, board, is_max):
-        # Simple hash of grid keys and current player
-        # board.grid keys are (q,r), values are Piece(color)
-        # We need a string or tuple representation
-        grid_tuple = tuple(sorted([(k, v.color) for k, v in board.grid.items()]))
-        return (grid_tuple, is_max)
+        """
+        Calculate Zobrist Hash for the board state.
+        """
+        h = 0
+        for pos, piece in board.grid.items():
+            # pos is (q, r), piece.color is 'B' or 'W'
+            # XOR with the random value for this piece at this position
+            # If key missing (out of bounds?), skip or 0. Should be in bounds.
+            z_key = (pos[0], pos[1], piece.color)
+            if z_key in self.zobrist_table:
+                h ^= self.zobrist_table[z_key]
+        
+        # XOR for turn if maximizing player
+        if is_max:
+            h ^= self.turn_hash
+            
+        return h

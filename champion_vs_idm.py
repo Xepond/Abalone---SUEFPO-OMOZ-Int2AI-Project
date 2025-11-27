@@ -79,7 +79,7 @@ def dynamic_evaluate(self, board, player_color, move=None, move_maker_color=None
     score = total_material + total_aggression + total_cohesion + total_center + total_danger
     
     # Random Jitter to break ties/loops
-    score += random.uniform(-500, 500)
+    score += random.uniform(-100, 100)
     
     breakdown = {
         'Material': total_material,
@@ -162,9 +162,9 @@ class Arena:
         board.init_board()
         
         # Initialize AIs
-        # Champion (Minimax+ABP) gets 5.0s, ID Minimax gets 2.0s (Weaker CPU budget)
-        t1 = 5.0 if p1_algo == "Minimax+ABP" else 2.0
-        t2 = 5.0 if p2_algo == "Minimax+ABP" else 2.0
+        # Champion (Minimax+ABP) gets 6.0s, ID Minimax gets 2.0s
+        t1 = 6.0 if p1_algo == "Minimax+ABP" else 2.0
+        t2 = 6.0 if p2_algo == "Minimax+ABP" else 2.0
         
         ai_black = AbaloneAI()
         ai_black.set_config(p1_algo, 1, t1, 'B')
@@ -172,19 +172,21 @@ class Arena:
         ai_white = AbaloneAI()
         ai_white.set_config(p2_algo, 1, t2, 'W')
         
-        # Default Weights: [Material, Push, Cohesion, Center, Danger]
-        # Increased Push to 2000 to force contact
-        default_weights = [10000, 2000, 10, 3, -250]
+        # Specific Weights
+        # ID Minimax: Defensive [Material, Push, Cohesion, Center, Danger]
+        weights_idm = [10000, 50, 50, 0, -500]
+        # Champion: Aggressive [Material, Push, Cohesion, Center, Danger]
+        weights_champ = [10000, 150, 10, 500, -10]
         
-        # Inject Weights
-        ai_black.weights = list(default_weights)
-        ai_white.weights = list(default_weights)
-        
-        # Asymmetry: Boost Aggression for Champion
-        if p1_algo == "Minimax+ABP":
-            ai_black.weights[1] *= 1.2 # Boost Push
-        if p2_algo == "Minimax+ABP":
-            ai_white.weights[1] *= 1.2 # Boost Push
+        if p1_algo == "ID Minimax":
+            ai_black.weights = list(weights_idm)
+        else:
+            ai_black.weights = list(weights_champ)
+            
+        if p2_algo == "ID Minimax":
+            ai_white.weights = list(weights_idm)
+        else:
+            ai_white.weights = list(weights_champ)
         
         # Bind Dynamic Evaluate (Patching 'evaluate' as it is the method called by engine)
         ai_black.evaluate = types.MethodType(dynamic_evaluate, ai_black)
