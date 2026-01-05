@@ -168,6 +168,8 @@ python benchmark_suite.py
 
 ## 📸 Screenshots
 
+![Main Menu](assets/mainmenu.png)
+
 ![Abalone Gameplay](assets/gameplay.png)
 
 ## 👨‍💻 Contributors
