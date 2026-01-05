@@ -27,17 +27,17 @@
 <br />
 
 ## 📖 Table of Contents
-- [About](#about)
-- [Features](#features)
-- [AI Algorithms](#ai-algorithms)
-- [Technologies Used](#technologies-used)
-- [Installation](#installation)
-- [How to Play](#how-to-play)
-- [Project Structure](#project-structure)
-- [Testing](#testing)
-- [Screenshots](#screenshots)
-- [Contributors](#contributors)
-- [License](#license)
+- [About](#-about)
+- [Features](#-features)
+- [AI Algorithms](#-ai-algorithms)
+- [Technologies Used](#️-technologies-used)
+- [Installation](#-installation)
+- [How to Play](#-how-to-play)
+- [Project Structure](#-project-structure)
+- [Testing](#-testing)
+- [Screenshots](#-screenshots)
+- [Contributors](#-contributors)
+- [License](#-license)
 
 ## 📌 About
 
