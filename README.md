@@ -52,7 +52,7 @@ This project was developed as part of the **Introduction to Artificial Intellige
 - ⚡ **Smooth Animations** - Linear interpolation (LERP) based marble movement animations
 - 📊 **Developer Mode** - Real-time metrics dashboard showing nodes explored, search depth, and evaluation scores
 - 🎯 **Ghost Preview** - Visual feedback showing potential move destinations
-- 🏆 **Game Modes** - Human vs AI, AI vs AI, and Human vs Human
+- 🏆 **Game Modes** - Human vs AI and Human vs Human
 
 ## 🧠 AI Algorithms
 
@@ -139,12 +139,14 @@ proje/
 
 ## 🧪 Testing
 
+The following scripts run in **terminal-only mode** (no GUI) for fast performance analysis:
+
 Run unit tests to verify AI functionality:
 ```bash
 python test_ai_engine.py
 ```
 
-Run AI comparison benchmarks:
+Run AI vs AI comparison benchmarks:
 ```bash
 python ai_comparison.py
 ```
