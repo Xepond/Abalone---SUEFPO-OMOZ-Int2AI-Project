@@ -36,7 +36,9 @@
 - [Project Structure](#-project-structure)
 - [Testing](#-testing)
 - [Screenshots](#-screenshots)
+- [Future Improvements](#-future-improvements)
 - [Contributors](#-contributors)
+- [Acknowledgments](#-acknowledgments)
 - [License](#-license)
 
 ## 📌 About
@@ -168,14 +170,38 @@ python benchmark_suite.py
 
 ## 📸 Screenshots
 
+### Main Menu
+*The polished main menu with glass-style buttons and custom background art.*
+
 ![Main Menu](assets/mainmenu.png)
 
+### Gameplay
+*In-game view showing the hexagonal board, marble pieces, and score panels.*
+
 ![Abalone Gameplay](assets/gameplay.png)
+
+## 🚀 Future Improvements
+
+- 🎮 **AI vs AI Visual Mode** - Watch AI algorithms battle with full GUI
+- ↩️ **Undo/Redo System** - Allow players to take back moves
+- 🔊 **Sound Effects** - Add audio feedback for moves and captures
+- 🌐 **Online Multiplayer** - Play against friends over the network
+- 📱 **Responsive UI** - Support for different screen resolutions
+- 🧬 **Genetic Algorithm Training** - Evolve optimal heuristic weights
+- 🌳 **Monte Carlo Tree Search (MCTS)** - Compare Minimax with MCTS for endgame performance
+- 🧠 **Neural Networks** - Train a model using Reinforcement Learning instead of hand-crafted heuristics
 
 ## 👨‍💻 Contributors
 **Pair #59 - SUEFPO-OMOZ - Team "Cant Talk Only TFT"**
 - **Süleyman Efe POLAT** - 3rd Year Computer Engineering Student [![GitHub](https://img.shields.io/badge/GitHub-Xepond-181717?logo=github)](https://github.com/Xepond)
 - **Ömer ÖZKAN** - 3rd Year Computer Engineering Student [![GitHub](https://img.shields.io/badge/GitHub-merzkan1-181717?logo=github)](https://github.com/merzkan1)
+
+## 🙏 Acknowledgments
+
+- **Michel Lalet & Laurent Lévi** - Original creators of Abalone (1987)
+- **Dr. Öğr. Üyesi Savaş OKYAY** - Course lecturer and project supervisor
+- **Pygame Community** - For excellent documentation and tutorials
+- **Eskişehir Osmangazi University** - Computer Engineering Department
 
 ## 📄 License
 
