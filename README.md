@@ -183,7 +183,6 @@ python benchmark_suite.py
 ## 🚀 Future Improvements
 
 - 🎮 **AI vs AI Visual Mode** - Watch AI algorithms battle with full GUI
-- ↩️ **Undo/Redo System** - Allow players to take back moves
 - 🔊 **Sound Effects** - Add audio feedback for moves and captures
 - 🌐 **Online Multiplayer** - Play against friends over the network
 - 📱 **Responsive UI** - Support for different screen resolutions
