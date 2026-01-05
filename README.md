@@ -92,7 +92,7 @@ cd Abalone---SUEFPO-OMOZ-Int2AI-Project
 
 2. Install dependencies:
 ```bash
-pip install pygame matplotlib
+pip install -r requirements.txt
 ```
 
 3. Run the game:
@@ -167,10 +167,12 @@ python benchmark_suite.py
 
 ## 👨‍💻 Contributors
 **Pair #59 - SUEFPO-OMOZ - Team "Cant Talk Only TFT"**
-- **Süleyman Efe POLAT** - 3rd Year Computer Engineering Student
-- **Ömer ÖZKAN** - 3rd Year Computer Engineering Student
+- **Süleyman Efe POLAT** - 3rd Year Computer Engineering Student [![GitHub](https://img.shields.io/badge/GitHub-Xepond-181717?logo=github)](https://github.com/Xepond)
+- **Ömer ÖZKAN** - 3rd Year Computer Engineering Student [![GitHub](https://img.shields.io/badge/GitHub-merzkan1-181717?logo=github)](https://github.com/merzkan1)
 
 ## 📄 License
+
+This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
 
 This project was developed for educational purposes as part of the Int2AI course project.
 
