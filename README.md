@@ -5,9 +5,9 @@
 <h1 align="center">Abalone AI Game</h1>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Python-3.x-blue.svg" alt="Python">
-  <img src="https://img.shields.io/badge/Pygame-2.0+-yellow.svg" alt="Pygame">
-  <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License">
+  <a href="https://www.python.org/"><img src="https://img.shields.io/badge/Python-3.x-blue.svg" alt="Python"></a>
+  <a href="https://www.pygame.org/"><img src="https://img.shields.io/badge/Pygame-2.0+-yellow.svg" alt="Pygame"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License"></a>
 </p>
 
 <p align="center">
@@ -37,6 +37,7 @@
 - [Testing](#testing)
 - [Screenshots](#screenshots)
 - [Contributors](#contributors)
+- [License](#license)
 
 ## 📌 About
 
@@ -125,6 +126,8 @@ proje/
 ├── ai_comparison.py     # Arena system for AI vs AI benchmarking
 ├── benchmark_suite.py   # Performance metrics and graph generation
 ├── test_ai_engine.py    # Unit tests for AI algorithms
+├── requirements.txt     # Python dependencies
+├── LICENSE              # MIT License
 ├── assets/
 │   ├── black_marble.png
 │   ├── white_marble.png
@@ -178,4 +181,10 @@ This project was developed for educational purposes as part of the Int2AI course
 
 ---
 
-*Made with ❤️ and Python*
+<p align="center">
+  <i>Made with ❤️ and Python</i>
+</p>
+
+<p align="center">
+  <a href="#abalone-ai-game">⬆️ Back to Top</a>
+</p>
